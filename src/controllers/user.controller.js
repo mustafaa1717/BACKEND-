@@ -1,11 +1,13 @@
 
 import { asynchandler } from "../utils/asynchandler.js";
-import {Apierror} from "../utils/Apierror.js"
+import { Apierror } from "../utils/Apierror.js";
+import { Apires } from "../utils/Apires.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
-import { Apires } from "../utils/Apires.js";
 import jwt from "jsonwebtoken";
+
 const generateAccessTokenAndReffereshToken= async(userId)=>{
+
   try {
        const user= await User.findById(userId);
        const accesToken=user.generateAccessToken()
@@ -23,6 +25,7 @@ const generateAccessTokenAndReffereshToken= async(userId)=>{
 
 
 const registeruser=asynchandler(async(req,res)=>{
+
 
     console.log("BODY:", req.body);
     console.log("FILES:", req.files);
@@ -213,4 +216,119 @@ const reffereshAccessToken=asynchandler(async(req,res)=>{
  )
 })
 
-export {registeruser,loginuser,logoutuser,reffereshAccessToken}
+const changePassword=asynchandler(async(req,res)=>{
+  const {oldpassword,newpassword,confpassword}=req.body
+  
+  if(!(newpassword === confpassword)){
+    throw new Apierror(400,"the passowrd is not matching with the new one")
+  }
+
+  const user=await User.findById(req.user?._id)
+   
+ const isPasswordCorrect= user.isPasswordCorrect(oldpassword)
+
+ if(!isPasswordCorrect){
+  throw new Apierror(401,"the old password is not correct")
+ }
+  user.password=newpassword
+  await user.save({validateBeforeSave:false})
+
+  return res
+  .status(200)
+  .json(new Apires(200,{},"password is changed succesfully"))
+
+})
+
+const getcurrentuser=asynchandler(async(req,res)=>{
+  return res
+  .status(200)
+  .json(new Apires(200,req.user," current user fetched succesfully"))
+})
+
+const updateAccount=asynchandler(async(req,res)=>{
+  const{fullname,email}=req.body
+
+  if(!(username || email)){
+    throw new Apierror(400,"invalid username or email")
+  }
+   
+  const user=User.findByIdAndUpdate(req.user?._id,
+    {
+   $set:{
+      fullname:fullname,
+      email:email
+   }
+    },
+    {
+      new:true 
+    }
+  ).select("-password")
+
+  return res
+  .status(200)
+  .json(new Apires(200,user,"account details updated succesfully"))
+
+
+})
+
+const updateAvatar=asynchandler(async(req,res)=>{
+  const avatarpath=req.file?.path
+
+  if(!avatarpath){
+    throw new Apierror(404,"invalid avatar path")
+  }
+    const avatar = await uploadOnCloudinary(avatarpath)
+  
+    if(!avatar.url){
+      throw new Apierror(406,"invalid url of avatar ")
+    }
+
+    const user=await User.findByIdAndUpdate(req.user._id,
+      {
+        $set:{
+          avatar:avatar.url
+        }
+      },
+      {
+        new:true
+      }
+    ).select("-password")
+  return res
+  .status(200)
+  .json(new Apires(200,user,"avatar is updated succesfully"))
+})
+
+const updateCoverimage= asynchandler(async(req,res)=>{
+  const coverimagepath=req.file?.path
+
+  if(!coverimagepath){
+    throw new Apierror(400,"invalid path for cover image")
+  }
+
+  const coverImage=await uploadOnCloudinary(coverimagepath)
+  
+  if(!coverImage){
+     throw new Apierror(400,"invalid path for cover image")
+  }
+  //update karde ab to sab sahi chal raha hai
+
+  const user=await User.findByIdAndUpdate(req.user?._id,
+    {
+      $set:{
+        coverImage:coverimage.url
+      }
+    },
+    {
+      new:true
+    }
+  ).select("-password")
+
+   return res
+  .status(200)
+  .json(new Apires(200,user,"coverimage  is updated succesfully"))
+})
+
+
+export {registeruser,loginuser,logoutuser,reffereshAccessToken,changePassword
+  ,getcurrentuser,updateAvatar,updateCoverimage
+}
